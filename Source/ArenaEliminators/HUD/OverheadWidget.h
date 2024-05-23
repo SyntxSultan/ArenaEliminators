@@ -23,3 +23,4 @@ public:
 protected:
 	virtual void NativeDestruct() override;
 };
+                           

@@ -19,10 +19,14 @@ void UArenaCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		ArenaCharacter = Cast<AArenaCharacter>(TryGetPawnOwner());
 	}
 	if (ArenaCharacter == nullptr) return;
+	
 	FVector Velocity = ArenaCharacter->GetVelocity();
 	Velocity.Z = 0.f;
 	Speed = Velocity.Size();
 
 	bIsInAir = ArenaCharacter->GetCharacterMovement()->IsFalling();
 	bIsAccelerating = ArenaCharacter->GetCharacterMovement()->GetCurrentAcceleration().Size() > 0.f ? true : false;
+	bWeaponEquipped = ArenaCharacter->IsWeaponEquipped();
+	bIsCrouched = ArenaCharacter->bIsCrouched;
+	bAiming = ArenaCharacter->IsAiming();
 }
