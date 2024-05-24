@@ -10,6 +10,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "ArenaEliminators/ArenaComponents/CombatComponent.h"
 #include "ArenaEliminators/Weapon/Weapon.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/WidgetComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -37,6 +38,9 @@ AArenaCharacter::AArenaCharacter()
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
+
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	GetMesh()->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 }
 
 void AArenaCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
