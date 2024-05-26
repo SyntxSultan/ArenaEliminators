@@ -3,6 +3,7 @@
 
 #include "ArenaCharacterAnimInstance.h"
 #include "ArenaCharacter.h"
+#include "ArenaEliminators/Weapon/Weapon.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 
@@ -28,8 +29,10 @@ void UArenaCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bIsInAir = ArenaCharacter->GetCharacterMovement()->IsFalling();
 	bIsAccelerating = ArenaCharacter->GetCharacterMovement()->GetCurrentAcceleration().Size() > 0.f ? true : false;
 	bWeaponEquipped = ArenaCharacter->IsWeaponEquipped();
+	EquippedWeapon = ArenaCharacter->GetEquippedWeapon();
 	bIsCrouched = ArenaCharacter->bIsCrouched;
 	bAiming = ArenaCharacter->IsAiming();
+	TurningInPlace = ArenaCharacter->GetTurningInPlace();
 
 	// Offset yaw for strafing
 	FRotator AimRotation = ArenaCharacter->GetBaseAimRotation();
@@ -45,4 +48,19 @@ void UArenaCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	const float Target = Delta.Yaw / DeltaSeconds;
 	const float Interp = FMath::FInterpTo(Lean, Target, DeltaSeconds, 6.f);
 	Lean = FMath::Clamp(Interp, -90.f, 90.f);
+
+	//Aim Offset Calculations
+	AO_Yaw = ArenaCharacter->GetAO_Yaw();
+	AO_Pitch = ArenaCharacter->GetAO_Pitch();
+
+	//FABRIK IK
+	if (bWeaponEquipped && EquippedWeapon && EquippedWeapon->GetWeaponMesh() && ArenaCharacter->GetMesh())
+	{
+		LeftHandTransform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("LeftHandSocket"), RTS_World);
+		FVector OutPos;
+		FRotator OutRot;
+		ArenaCharacter->GetMesh()->TransformToBoneSpace(FName("hand_r"), LeftHandTransform.GetLocation(), FRotator::ZeroRotator, OutPos, OutRot);
+		LeftHandTransform.SetLocation(OutPos);
+		LeftHandTransform.SetRotation(FQuat(OutRot));
+	}
 }

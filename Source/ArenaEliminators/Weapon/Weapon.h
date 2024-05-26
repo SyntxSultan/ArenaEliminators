@@ -16,6 +16,9 @@ enum class EWeaponState : uint8
 	EWS_Max UMETA(DisplayName = "Max")
 };
 
+class UAnimationAsset;
+class UWidgetComponent;
+
 UCLASS()
 class ARENAELIMINATORS_API AWeapon : public AActor
 {
@@ -26,6 +29,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	void ShowPickupWidget(bool bShowWidget);
+	virtual void Fire(const FVector& HitTarget);
 protected:
 	virtual void BeginPlay() override;
 	
@@ -47,8 +51,11 @@ private:
 	void OnRep_WeaponState();
 
 	UPROPERTY(VisibleAnywhere, Category="Weapon Properties")
-	class UWidgetComponent* PickupWidget;
+	UWidgetComponent* PickupWidget;
+	UPROPERTY(EditAnywhere, Category="Weapon Properties")
+	UAnimationAsset* FireAnimation;
 public:
 	void SetWeaponState(EWeaponState NewState);
 	FORCEINLINE USphereComponent* GetAreaSphere() const { return  AreaSphere; }
+	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
 };

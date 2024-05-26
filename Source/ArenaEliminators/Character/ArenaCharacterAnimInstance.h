@@ -4,11 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "Animation/AnimInstance.h"
+#include "ArenaEliminators/ArenaTypes/TurningInPlace.h"
 #include "ArenaCharacterAnimInstance.generated.h"
 
-/**
- * 
- */
+class AWeapon;
+
 UCLASS()
 class ARENAELIMINATORS_API UArenaCharacterAnimInstance : public UAnimInstance
 {
@@ -27,6 +27,7 @@ private:
 	bool bIsAccelerating;
 	UPROPERTY(BlueprintReadOnly, Category=Movement, meta=(AllowPrivateAccess = "true"))
 	bool bWeaponEquipped;
+	AWeapon* EquippedWeapon;
 	UPROPERTY(BlueprintReadOnly, Category=Movement, meta=(AllowPrivateAccess = "true"))
 	bool bIsCrouched;
 	UPROPERTY(BlueprintReadOnly, Category=Movement, meta=(AllowPrivateAccess = "true"))
@@ -39,4 +40,15 @@ private:
 	FRotator CharacterRotationLastFrame;
 	FRotator CharacterRotation;
 	FRotator DeltaRotation;
+
+	UPROPERTY(BlueprintReadOnly, Category=Movement, meta=(AllowPrivateAccess = "true"))
+	float AO_Yaw;
+	UPROPERTY(BlueprintReadOnly, Category=Movement, meta=(AllowPrivateAccess = "true"))
+	float AO_Pitch;
+
+	UPROPERTY(BlueprintReadOnly, Category=Movement, meta=(AllowPrivateAccess = "true"))
+	FTransform LeftHandTransform;
+
+	UPROPERTY(BlueprintReadOnly, Category=Movement, meta=(AllowPrivateAccess = "true"))
+	ETurningInPlace TurningInPlace;
 };

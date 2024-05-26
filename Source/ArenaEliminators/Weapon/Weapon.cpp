@@ -7,6 +7,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Animation/AnimationAsset.h"
 
 AWeapon::AWeapon()
 {
@@ -99,5 +100,13 @@ void AWeapon::ShowPickupWidget(bool bShowWidget)
 {
 	if (!PickupWidget) return;
 	PickupWidget->SetVisibility(bShowWidget);
+}
+
+void AWeapon::Fire(const FVector& HitTarget)
+{
+	if (FireAnimation)
+	{
+		WeaponMesh->PlayAnimation(FireAnimation, false);
+	}
 }
 

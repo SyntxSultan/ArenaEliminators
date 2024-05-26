@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "CombatComponent.generated.h"
 
+#define TRACE_LENGTH 80000.f
 class AWeapon;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -18,14 +19,26 @@ public:
 	friend class AArenaCharacter;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	
 	void EquipWeapon(AWeapon* WeaponToEquip);
 protected:
 	virtual void BeginPlay() override;
+
+	UFUNCTION()
+	void OnRep_EquippedWeapon();
+	
+	//Aiming
 	void SetAiming(bool bIsAiming);
 	UFUNCTION(Server, Reliable)
 	void ServerSetAiming(bool bIsAiming);
-	UFUNCTION()
-	void OnRep_EquippedWeapon();
+	//Firing
+	void FireButtonPressed(bool bPressed);
+	UFUNCTION(Server, Reliable)
+	void ServerFire();
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastFire();
+
+	void TraceUnderCrosshair(FHitResult& TraceHitResult);
 private:	
 	AArenaCharacter* Character;
 	
@@ -34,8 +47,13 @@ private:
 
 	UPROPERTY(Replicated)
 	bool bAiming;
+	
 	UPROPERTY(EditAnywhere)
 	float BaseWalkSpeed;
 	UPROPERTY(EditAnywhere)
 	float AimWalkSpeed;
+
+	bool bFireButtonPressed;
+
+	FVector HitTarget;
 };
