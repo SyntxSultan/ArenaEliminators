@@ -2,12 +2,13 @@
 
 
 #include "Weapon.h"
-
+#include "BulletShell.h"
 #include "ArenaEliminators/Character/ArenaCharacter.h"
 #include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Animation/AnimationAsset.h"
+#include "Engine/SkeletalMeshSocket.h"
 
 AWeapon::AWeapon()
 {
@@ -104,9 +105,20 @@ void AWeapon::ShowPickupWidget(bool bShowWidget)
 
 void AWeapon::Fire(const FVector& HitTarget)
 {
-	if (FireAnimation)
+	if (FireAnimation) //Play Fire Animations
 	{
 		WeaponMesh->PlayAnimation(FireAnimation, false);
+	}
+	if (ShellClass) //Spawning Bullet Shells
+	{
+		if (const USkeletalMeshSocket* AmmoEjectSocket = GetWeaponMesh()->GetSocketByName(FName("AmmoEject")))
+		{
+			FTransform SocketTransform = AmmoEjectSocket->GetSocketTransform(GetWeaponMesh());
+			if (UWorld* World = GetWorld())
+			{
+					World->SpawnActor<ABulletShell>(ShellClass, SocketTransform.GetLocation(), SocketTransform.GetRotation().Rotator());
+			}
+		}
 	}
 }
 

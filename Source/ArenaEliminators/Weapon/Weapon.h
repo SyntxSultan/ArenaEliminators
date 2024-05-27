@@ -18,6 +18,7 @@ enum class EWeaponState : uint8
 
 class UAnimationAsset;
 class UWidgetComponent;
+class ABulletShell;
 
 UCLASS()
 class ARENAELIMINATORS_API AWeapon : public AActor
@@ -54,6 +55,9 @@ private:
 	UWidgetComponent* PickupWidget;
 	UPROPERTY(EditAnywhere, Category="Weapon Properties")
 	UAnimationAsset* FireAnimation;
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<ABulletShell> ShellClass;
 public:
 	void SetWeaponState(EWeaponState NewState);
 	FORCEINLINE USphereComponent* GetAreaSphere() const { return  AreaSphere; }
