@@ -37,6 +37,7 @@ AArenaCharacter::AArenaCharacter()
 
 	Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
 	Combat->SetIsReplicated(true);
+	Combat->PrimaryComponentTick.bCanEverTick = true;
 
 	bUseControllerRotationYaw = false;
 	GetCharacterMovement()->AirControl = 500.f;

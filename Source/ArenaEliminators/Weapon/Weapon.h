@@ -19,6 +19,7 @@ enum class EWeaponState : uint8
 class UAnimationAsset;
 class UWidgetComponent;
 class ABulletShell;
+class UTexture2D;
 
 UCLASS()
 class ARENAELIMINATORS_API AWeapon : public AActor
@@ -31,6 +32,17 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	void ShowPickupWidget(bool bShowWidget);
 	virtual void Fire(const FVector& HitTarget);
+	//Textures for crosshair
+	UPROPERTY(EditAnywhere, Category="Crosshairs")
+	UTexture2D* CrosshairCenter;
+	UPROPERTY(EditAnywhere, Category="Crosshairs")
+	UTexture2D* CrosshairLeft;
+	UPROPERTY(EditAnywhere, Category="Crosshairs")
+	UTexture2D* CrosshairRight;
+	UPROPERTY(EditAnywhere, Category="Crosshairs")
+	UTexture2D* CrosshairTop;
+	UPROPERTY(EditAnywhere, Category="Crosshairs")
+	UTexture2D* CrosshairBottom;
 protected:
 	virtual void BeginPlay() override;
 	

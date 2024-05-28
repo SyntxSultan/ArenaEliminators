@@ -7,6 +7,8 @@
 #include "CombatComponent.generated.h"
 
 #define TRACE_LENGTH 80000.f
+class AArenaHUD;
+class AArenaPlayerController;
 class AWeapon;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -39,8 +41,11 @@ protected:
 	void MulticastFire(const FVector_NetQuantize& TraceHitTarget);
 
 	void TraceUnderCrosshair(FHitResult& TraceHitResult);
+	void SetHUDCrosshairs(float DeltaTime);
 private:	
 	AArenaCharacter* Character;
+	AArenaPlayerController* PlayerController;
+	AArenaHUD* HUD;
 	
 	UPROPERTY(ReplicatedUsing=OnRep_EquippedWeapon)
 	AWeapon* EquippedWeapon;
