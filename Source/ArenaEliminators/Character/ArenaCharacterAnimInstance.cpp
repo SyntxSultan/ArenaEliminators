@@ -32,6 +32,7 @@ void UArenaCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	EquippedWeapon = ArenaCharacter->GetEquippedWeapon();
 	bIsCrouched = ArenaCharacter->bIsCrouched;
 	bAiming = ArenaCharacter->IsAiming();
+	bRotateRootBone = ArenaCharacter->ShouldRotateRootBone();
 	TurningInPlace = ArenaCharacter->GetTurningInPlace();
 
 	// Offset yaw for strafing
@@ -62,5 +63,12 @@ void UArenaCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		ArenaCharacter->GetMesh()->TransformToBoneSpace(FName("hand_r"), LeftHandTransform.GetLocation(), FRotator::ZeroRotator, OutPos, OutRot);
 		LeftHandTransform.SetLocation(OutPos);
 		LeftHandTransform.SetRotation(FQuat(OutRot));
+		if (ArenaCharacter->IsLocallyControlled())
+		{
+			bLocallyControlled = true;
+			FTransform RightHandTransform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("hand_r"), ERelativeTransformSpace::RTS_World);
+			FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(RightHandTransform.GetLocation(), RightHandTransform.GetLocation() + (RightHandTransform.GetLocation() - ArenaCharacter->GetHitTarget()));
+			RightHandRotation = FMath::RInterpTo(RightHandRotation, LookAtRotation, DeltaSeconds, 23.f);
+		}
 	}
 }

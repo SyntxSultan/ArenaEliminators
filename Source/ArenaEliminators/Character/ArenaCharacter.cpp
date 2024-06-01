@@ -2,13 +2,14 @@
 
 
 #include "ArenaCharacter.h"
-
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/InputComponent.h"
 #include "EnhancedInputComponent.h" 
 #include "EnhancedInputSubsystems.h"
+#include "ArenaEliminators/ArenaEliminators.h"
 #include "ArenaEliminators/ArenaComponents/CombatComponent.h"
+#include "ArenaEliminators/PlayerController/ArenaPlayerController.h"
 #include "ArenaEliminators/Weapon/Weapon.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/WidgetComponent.h"
@@ -45,7 +46,9 @@ AArenaCharacter::AArenaCharacter()
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 0.f, 850.f);
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	GetMesh()->SetCollisionObjectType(ECC_SkeletalMesh);
 	GetMesh()->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
 	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 }
@@ -54,6 +57,7 @@ void AArenaCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(AArenaCharacter, OverlappingWeapon, COND_OwnerOnly);
+	DOREPLIFETIME(AArenaCharacter, Health);
 }
 
 void AArenaCharacter::PostInitializeComponents()
@@ -62,21 +66,15 @@ void AArenaCharacter::PostInitializeComponents()
 	Combat->Character = this;
 }
 
-void AArenaCharacter::PlayFireMontage(bool bAiming)
-{
-	if (Combat == nullptr || Combat->EquippedWeapon == nullptr) return;
-	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance(); AnimInstance && FireWeaponMontage)
-	{
-		AnimInstance->Montage_Play(FireWeaponMontage);
-		FName SectionName;
-		SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
-		AnimInstance->Montage_JumpToSection(SectionName);
-	}
-}
-
 void AArenaCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	ArenaPlayerController = Cast<AArenaPlayerController>(Controller);
+	
+	if (ArenaPlayerController)
+	{
+		ArenaPlayerController->SetHUDHealth(Health, MaxHealth);
+	}
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
@@ -89,7 +87,20 @@ void AArenaCharacter::BeginPlay()
 void AArenaCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	AimOffset(DeltaTime);
+	if (GetLocalRole() > ROLE_SimulatedProxy && IsLocallyControlled())
+	{
+		AimOffset(DeltaTime);
+	}
+	else
+	{
+		TimeSinceLastMovementReplication += DeltaTime;
+		if (TimeSinceLastMovementReplication > 0.25f)
+		{
+			OnRep_ReplicatedMovement();
+		}
+		CalculateAO_Pitch();
+	}
+	HideCameraIfCharacterClose();
 }
 
 void AArenaCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -117,6 +128,13 @@ void AArenaCharacter::Move(const FInputActionValue& Value)
 	const FVector RightDirection(FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y));
 	AddMovementInput(ForwardDirection, MovementVector.Y);
 	AddMovementInput(RightDirection, MovementVector.X);
+}
+
+void AArenaCharacter::OnRep_ReplicatedMovement()
+{
+	Super::OnRep_ReplicatedMovement();
+	SimProxiesTurn();
+	TimeSinceLastMovementReplication = 0.f;
 }
 
 void AArenaCharacter::Look(const FInputActionValue& Value)
@@ -167,7 +185,7 @@ void AArenaCharacter::CrouchButtonPressed()
 	{
 		UnCrouch();
 	}
-	else
+	else if (!GetCharacterMovement()->IsFalling())
 	{		
 		Crouch();
 	}
@@ -189,16 +207,27 @@ void AArenaCharacter::AimButtonReleased()
 	}
 }
 
+void AArenaCharacter::CalculateAO_Pitch()
+{
+	AO_Pitch = GetBaseAimRotation().Pitch;
+	if (AO_Pitch > 90.f && !IsLocallyControlled()) //Correction for compressed rotation values sent over network
+	{
+		//map pitch from [270, 360) to [-90,0)
+		const FVector2D InRange(270.f, 360.f);
+		const FVector2D OutRange(-90.f, 0.f);
+		AO_Pitch = FMath::GetMappedRangeValueClamped(InRange, OutRange, AO_Pitch);
+	}
+}
+
 void AArenaCharacter::AimOffset(float DeltaTime)
 {
 	if (Combat && Combat->EquippedWeapon == nullptr) return;
-	FVector Velocity = GetVelocity();
-	Velocity.Z = 0.f;
-	float Speed = Velocity.Size();
+	float Speed = CalculateSpeed();
 	bool bIsInAir = GetCharacterMovement()->IsFalling();
 
 	if (Speed == 0.f && !bIsInAir) //Character is standing still and not jumping
 	{
+		bRotateRootBone = true;
 		FRotator CurrentAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
 		FRotator Delta = UKismetMathLibrary::NormalizedDeltaRotator(CurrentAimRotation,StartingAimRotation);
 		AO_Yaw = Delta.Yaw;
@@ -211,19 +240,46 @@ void AArenaCharacter::AimOffset(float DeltaTime)
 	}
 	if (Speed > 0.f || bIsInAir) // When running or jumping
 	{
+		bRotateRootBone = false;
 		StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
 		AO_Yaw = 0.f;
 		bUseControllerRotationYaw = true;
 		TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 	}
-	AO_Pitch = GetBaseAimRotation().Pitch;
-	if (AO_Pitch > 90.f && !IsLocallyControlled()) //Correction for compressed rotation values sent over network
+	CalculateAO_Pitch();
+}
+
+void AArenaCharacter::SimProxiesTurn()
+{
+	if (Combat == nullptr || Combat->EquippedWeapon == nullptr) return;
+	bRotateRootBone = false;
+	float Speed = CalculateSpeed();
+	if (Speed > 0.f)
 	{
-		//map pitch from [270, 360) to [-90,0)
-		const FVector2D InRange(270.f, 360.f);
-		const FVector2D OutRange(-90.f, 0.f);
-		AO_Pitch = FMath::GetMappedRangeValueClamped(InRange, OutRange, AO_Pitch);
+		TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+		return;
 	}
+
+	ProxyRotationLastFrame = ProxyRotation;
+	ProxyRotation = GetActorRotation();
+	ProxyYaw = UKismetMathLibrary::NormalizedDeltaRotator(ProxyRotation, ProxyRotationLastFrame).Yaw;
+	if (FMath::Abs(ProxyYaw) > TurnThreshold)
+	{
+		if (ProxyYaw > TurnThreshold)
+		{
+			TurningInPlace = ETurningInPlace::ETIP_Right;
+		}
+		else if (ProxyYaw < -TurnThreshold)
+		{
+			TurningInPlace = ETurningInPlace::ETIP_Left;
+		}
+		else
+		{
+			TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+		}
+		return;
+	}
+	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 }
 
 void AArenaCharacter::FireButtonPressed()
@@ -239,6 +295,18 @@ void AArenaCharacter::FireButtonReleased()
 	if (Combat)
 	{
 		Combat->FireButtonPressed(false);
+	}
+}
+
+void AArenaCharacter::PlayFireMontage(bool bAiming)
+{
+	if (Combat == nullptr || Combat->EquippedWeapon == nullptr) return;
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance(); AnimInstance && FireWeaponMontage)
+	{
+		AnimInstance->Montage_Play(FireWeaponMontage);
+		FName SectionName;
+		SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
+		AnimInstance->Montage_JumpToSection(SectionName);
 	}
 }
 
@@ -261,6 +329,53 @@ void AArenaCharacter::TurnInPlace(float DeltaTime)
 			TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 			StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
 		}
+	}
+}
+
+void AArenaCharacter::HideCameraIfCharacterClose()
+{
+	if (!IsLocallyControlled()) return;
+	if ((Camera->GetComponentLocation() - GetActorLocation()).Size() < CameraThreshold)
+	{
+		GetMesh()->SetVisibility(false);
+		if (Combat && Combat->EquippedWeapon)
+		{
+			Combat->EquippedWeapon->GetWeaponMesh()->bOwnerNoSee = true;
+		}
+	}
+	else
+	{
+		if (!GetMesh()->IsVisible())
+		{
+			GetMesh()->SetVisibility(true);
+		}		
+		if (Combat && Combat->EquippedWeapon && Combat->EquippedWeapon->GetWeaponMesh()->bOwnerNoSee == true)
+		{
+			Combat->EquippedWeapon->GetWeaponMesh()->bOwnerNoSee = false;
+		}
+	}
+}
+
+float AArenaCharacter::CalculateSpeed()
+{
+	FVector Velocity = GetVelocity();
+	Velocity.Z = 0.f;
+	return Velocity.Size();
+}
+
+void AArenaCharacter::OnRep_Health()
+{
+	
+}
+
+void AArenaCharacter::PlayHitReactMontage()
+{
+	if (Combat == nullptr || Combat->EquippedWeapon == nullptr) return;
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance(); AnimInstance && HitReactMontage)
+	{
+		AnimInstance->Montage_Play(HitReactMontage);
+		FName SectionName("FromFront");
+		AnimInstance->Montage_JumpToSection(SectionName);
 	}
 }
 
@@ -292,6 +407,10 @@ void AArenaCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon)
 	}
 }
 
+void AArenaCharacter::MulticastHit_Implementation()
+{
+	PlayHitReactMontage();
+}
 
 bool AArenaCharacter::IsWeaponEquipped()
 {
@@ -307,6 +426,12 @@ AWeapon* AArenaCharacter::GetEquippedWeapon()
 {
 	if (Combat == nullptr) return nullptr;
 	return Combat->EquippedWeapon;
+}
+
+FVector AArenaCharacter::GetHitTarget() const
+{
+	if (Combat == nullptr) return FVector();
+	return Combat->HitTarget;
 }
 
 

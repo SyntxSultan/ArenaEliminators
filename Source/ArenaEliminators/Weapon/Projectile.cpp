@@ -2,11 +2,11 @@
 
 
 #include "Projectile.h"
-
+#include "ArenaEliminators/ArenaEliminators.h"
+#include "ArenaEliminators/Character/ArenaCharacter.h"
 #include "Components/BoxComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "Particles/ParticleSystemComponent.h"
 #include "Particles/ParticleSystem.h"
 #include "Sound/SoundCue.h"
 
@@ -22,6 +22,7 @@ AProjectile::AProjectile()
 	CollisionBox->SetCollisionResponseToAllChannels(ECR_Ignore);
 	CollisionBox->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	CollisionBox->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+	CollisionBox->SetCollisionResponseToChannel(ECC_SkeletalMesh, ECR_Block);
 
 	ProjectileMovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComponent"));
 	ProjectileMovementComponent->bRotationFollowsVelocity = true;
@@ -43,21 +44,24 @@ void AProjectile::BeginPlay()
 void AProjectile::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	
 }
 
 void AProjectile::Destroyed()
 {
 	Super::Destroyed();
-	if (ImpactEffect && ImpactSound)
+	if (ImpactParticles && ImpactSound)
 	{
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, GetActorTransform());
+		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, GetActorTransform());
 		UGameplayStatics::PlaySoundAtLocation(this, ImpactSound, GetActorLocation());
 	}
 }
 
 void AProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
+	if (AArenaCharacter* ArenaCharacter = Cast<AArenaCharacter>(OtherActor))
+	{
+		ArenaCharacter->MulticastHit();
+	}
 	//Overriding Destroyed
 	Destroy();
 }

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ArenaEliminators/HUD/ArenaHUD.h"
 #include "Components/ActorComponent.h"
 #include "CombatComponent.generated.h"
 
@@ -28,7 +29,8 @@ protected:
 
 	UFUNCTION()
 	void OnRep_EquippedWeapon();
-	
+	void Fire();
+
 	//Aiming
 	void SetAiming(bool bIsAiming);
 	UFUNCTION(Server, Reliable)
@@ -47,6 +49,8 @@ private:
 	AArenaPlayerController* PlayerController;
 	AArenaHUD* HUD;
 	
+	FVector HitTarget;
+	
 	UPROPERTY(ReplicatedUsing=OnRep_EquippedWeapon)
 	AWeapon* EquippedWeapon;
 
@@ -60,4 +64,25 @@ private:
 
 	bool bFireButtonPressed;
 
+	//Crosshair And HUD
+	float CrosshairVelocityFactor;
+	float CrosshairInAirFactor;
+	float CrosshairAimFactor;
+	float CrosshairShootingFactor;
+	
+	FHUDPackage HUDPackage;
+	//Fov Settings
+	float DefaultFOV;
+	float CurrentFOV;
+	UPROPERTY(EditAnywhere)
+	float ZoomedFOV = 50.f;
+	UPROPERTY(EditAnywhere)
+	float ZoomInterpSpeed = 20.f;
+	void InterpFOV(float DeltaTime);
+	
+	//Auto Fire
+	FTimerHandle FireTimer;
+	bool bCanFire = true;
+	void StartFireTimer();
+	void FireTimerFinished();
 };

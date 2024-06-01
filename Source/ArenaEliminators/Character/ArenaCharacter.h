@@ -5,9 +5,11 @@
 #include "CoreMinimal.h"
 #include "InputActionValue.h"
 #include "ArenaEliminators/ArenaTypes/TurningInPlace.h"
+#include "ArenaEliminators/Interfaces/InteractWithCrosshairsInterface.h"
 #include "GameFramework/Character.h"
 #include "ArenaCharacter.generated.h"
 
+class AArenaPlayerController;
 class UWidgetComponent;
 class USpringArmComponent;
 class UCameraComponent;
@@ -16,7 +18,7 @@ class UInputAction;
 class UAnimMontage;
 
 UCLASS()
-class ARENAELIMINATORS_API AArenaCharacter : public ACharacter
+class ARENAELIMINATORS_API AArenaCharacter : public ACharacter, public IInteractWithCrosshairsInterface
 {
 	GENERATED_BODY()
 
@@ -27,6 +29,9 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PostInitializeComponents() override;
 	void PlayFireMontage(bool bAiming);
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastHit();
+	void OnRep_ReplicatedMovement() override;
 protected:
 	virtual void BeginPlay() override;
 	virtual void Jump() override;
@@ -36,10 +41,15 @@ protected:
 	void CrouchButtonPressed();
 	void AimButtonPressed();
 	void AimButtonReleased();
+	void CalculateAO_Pitch();
 	void AimOffset(float DeltaTime);
+	void SimProxiesTurn();
 	void FireButtonPressed();
 	void FireButtonReleased();
+	void PlayHitReactMontage();
 private:
+	AArenaPlayerController* ArenaPlayerController;
+	
 	//Components
 	UPROPERTY(VisibleAnywhere, Category=Camera)
 	USpringArmComponent* CameraBoom;
@@ -47,7 +57,7 @@ private:
 	UCameraComponent* Camera;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess = "true"))
 	UWidgetComponent* OverheadWidget;
-	UPROPERTY(VisibleAnywhere)
+	//UPROPERTY(VisibleAnywhere)
 	class UCombatComponent* Combat;
 	
 	UPROPERTY(ReplicatedUsing=OnRep_OverlappingWeapon)
@@ -60,15 +70,37 @@ private:
 
 	ETurningInPlace TurningInPlace;
 	void TurnInPlace(float DeltaTime);
-
-	UPROPERTY(EditAnywhere, Category=Combat)
-	UAnimMontage* FireWeaponMontage;
-
+	bool bRotateRootBone;
+	float TurnThreshold = 25.f;
+	
+	UPROPERTY(EditAnywhere)
+	float CameraThreshold = 200.f;
+	void HideCameraIfCharacterClose();
+	FRotator ProxyRotationLastFrame;
+	FRotator ProxyRotation;
+	float ProxyYaw;
+	float TimeSinceLastMovementReplication;
+	float CalculateSpeed();
+	
+	//Player health
+	UPROPERTY(EditAnywhere, Category="Player Stats")
+	float MaxHealth = 100.f;
+	UPROPERTY(ReplicatedUsing=OnRep_Health, VisibleAnywhere, Category="Player Stats")
+	float Health = 100.f;
+	UFUNCTION()
+	void OnRep_Health();
+	
 	//For aim offset calculations
 	float AO_Yaw;
 	float InterpAO_Yaw;
 	float AO_Pitch;
 	FRotator StartingAimRotation;
+	
+	//Animation Montages
+	UPROPERTY(EditAnywhere, Category=Combat)
+	UAnimMontage* FireWeaponMontage;
+	UPROPERTY(EditAnywhere, Category=Combat)
+	UAnimMontage* HitReactMontage;
 	
 	//Inputs
 	UPROPERTY(EditAnywhere, Category=Input)
@@ -92,7 +124,10 @@ public:
 	bool IsWeaponEquipped();
 	bool IsAiming();
 	AWeapon* GetEquippedWeapon();
+	FVector GetHitTarget() const;
 	FORCEINLINE float GetAO_Yaw() const { return AO_Yaw; }
 	FORCEINLINE float GetAO_Pitch() const { return AO_Pitch; }
-	FORCEINLINE ETurningInPlace GetTurningInPlace() const { return TurningInPlace; } 
+	FORCEINLINE bool ShouldRotateRootBone() const { return bRotateRootBone; }
+	FORCEINLINE ETurningInPlace GetTurningInPlace() const { return TurningInPlace; }
+	FORCEINLINE UCameraComponent* GetCamera() const { return Camera; }
 };
