@@ -2,24 +2,32 @@
 
 
 #include "ArenaCharacter.h"
+#include "TimerManager.h"
+#include "Sound/SoundCue.h"
+#include "Net/UnrealNetwork.h"
 #include "Camera/CameraComponent.h"
-#include "GameFramework/SpringArmComponent.h"
-#include "Components/InputComponent.h"
+#include "Particles/ParticleSystemComponent.h"
 #include "EnhancedInputComponent.h" 
 #include "EnhancedInputSubsystems.h"
+#include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "ArenaEliminators/Weapon/Weapon.h"
+#include "ArenaEliminators/Weapon/WeaponTypes.h"
 #include "ArenaEliminators/ArenaEliminators.h"
+#include "ArenaEliminators/GameMode/ArenaGameMode.h"
 #include "ArenaEliminators/ArenaComponents/CombatComponent.h"
 #include "ArenaEliminators/PlayerController/ArenaPlayerController.h"
-#include "ArenaEliminators/Weapon/Weapon.h"
-#include "Components/CapsuleComponent.h"
+#include "ArenaEliminators/PlayerState/ArenaPlayerState.h"
+#include "Components/InputComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Kismet/KismetMathLibrary.h"
-#include "Net/UnrealNetwork.h"
 
 AArenaCharacter::AArenaCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 	
 	NetUpdateFrequency = 66.f;
 	MinNetUpdateFrequency = 33.f;
@@ -40,6 +48,8 @@ AArenaCharacter::AArenaCharacter()
 	Combat->SetIsReplicated(true);
 	Combat->PrimaryComponentTick.bCanEverTick = true;
 
+	DissolveTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("DissolveTimelineComponent"));
+	
 	bUseControllerRotationYaw = false;
 	GetCharacterMovement()->AirControl = 500.f;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
@@ -69,11 +79,11 @@ void AArenaCharacter::PostInitializeComponents()
 void AArenaCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	ArenaPlayerController = Cast<AArenaPlayerController>(Controller);
+	UpdateHealthHUD();
 	
-	if (ArenaPlayerController)
+	if (HasAuthority())
 	{
-		ArenaPlayerController->SetHUDHealth(Health, MaxHealth);
+		OnTakeAnyDamage.AddDynamic(this, &ThisClass::ReceiveDamage);
 	}
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
@@ -87,6 +97,7 @@ void AArenaCharacter::BeginPlay()
 void AArenaCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	PollInit();
 	if (GetLocalRole() > ROLE_SimulatedProxy && IsLocallyControlled())
 	{
 		AimOffset(DeltaTime);
@@ -117,6 +128,7 @@ void AArenaCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Completed, this, &ThisClass::AimButtonReleased);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &ThisClass::FireButtonPressed);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &ThisClass::FireButtonReleased);
+		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Started, this, &ThisClass::ReloadButtonPressed);
 	}
 }
 
@@ -204,6 +216,14 @@ void AArenaCharacter::AimButtonReleased()
 	if (Combat)
 	{
 		Combat->SetAiming(false);
+	}
+}
+
+void AArenaCharacter::ReloadButtonPressed()
+{
+	if (Combat)
+	{
+		Combat->Reload();
 	}
 }
 
@@ -310,6 +330,25 @@ void AArenaCharacter::PlayFireMontage(bool bAiming)
 	}
 }
 
+void AArenaCharacter::PlayReloadMontage()
+{
+	if (Combat == nullptr || Combat->EquippedWeapon == nullptr) return;
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance(); AnimInstance && ReloadMontage)
+	{
+		AnimInstance->Montage_Play(ReloadMontage);
+		FName SectionName;
+		switch (Combat->EquippedWeapon->GetWeaponType())
+		{
+		case EWeaponType::EWT_AssaultRifle:
+			SectionName = FName("Rifle");
+			break;
+		case EWeaponType::EWT_MAX:
+			break;
+		}
+		AnimInstance->Montage_JumpToSection(SectionName);
+	}
+}
+
 void AArenaCharacter::TurnInPlace(float DeltaTime)
 {
 	if (AO_Yaw > 90.f) //Set turn in place right 
@@ -365,7 +404,46 @@ float AArenaCharacter::CalculateSpeed()
 
 void AArenaCharacter::OnRep_Health()
 {
-	
+	PlayHitReactMontage();
+	UpdateHealthHUD();
+}
+
+void AArenaCharacter::ReceiveDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType,AController* InstigatorController, AActor* DamageCauser)
+{
+	Health = FMath::Clamp(Health - Damage, 0.f, MaxHealth);
+	PlayHitReactMontage();
+	UpdateHealthHUD();
+	if (Health <= 0.f)
+	{
+		if (AArenaGameMode* ArenaGameMode = GetWorld()->GetAuthGameMode<AArenaGameMode>())
+		{
+			ArenaPlayerController = ArenaPlayerController == nullptr ? Cast<AArenaPlayerController>(Controller)  : ArenaPlayerController;
+			AArenaPlayerController* AttackerController = Cast<AArenaPlayerController>(InstigatorController);
+			ArenaGameMode->PlayerEliminated(this, ArenaPlayerController, AttackerController);
+		}
+	}
+}
+
+void AArenaCharacter::UpdateHealthHUD()
+{
+	ArenaPlayerController = ArenaPlayerController == nullptr ? Cast<AArenaPlayerController>(Controller) : ArenaPlayerController;
+	if (ArenaPlayerController)
+	{
+		ArenaPlayerController->SetHUDHealth(Health, MaxHealth);
+	}
+}
+
+void AArenaCharacter::PollInit()
+{
+	if (ArenaPlayerState == nullptr)
+	{
+		ArenaPlayerState = GetPlayerState<AArenaPlayerState>();
+		if (ArenaPlayerState)
+		{
+			ArenaPlayerState->AddToScore(0.f);
+			ArenaPlayerState->AddToDefeats(0);
+		}
+	}
 }
 
 void AArenaCharacter::PlayHitReactMontage()
@@ -376,6 +454,86 @@ void AArenaCharacter::PlayHitReactMontage()
 		AnimInstance->Montage_Play(HitReactMontage);
 		FName SectionName("FromFront");
 		AnimInstance->Montage_JumpToSection(SectionName);
+	}
+}
+
+void AArenaCharacter::Eliminated()
+{
+	if (Combat && Combat->EquippedWeapon)
+	{
+		Combat->EquippedWeapon->Dropped();
+	}
+	MulticastEliminated();
+	GetWorldTimerManager().SetTimer(ElimTimer, this, &ThisClass::ElimTimerFinished, ElimDelay);
+}
+
+void AArenaCharacter::MulticastEliminated_Implementation()
+{
+	bEliminated = true;
+	PlayEliminationMontage();
+	//Hud ammo set to 0
+	if (ArenaPlayerController)
+	{
+		ArenaPlayerController->SetHUDWeaponAmmo(0,0);
+	}
+	//On player died changing character material for dissolve effect And Start Dissolve
+	if (DissolveMaterialInstance && DissolveTimeline)
+	{
+		DynamicDissolveMaterialInstance = UMaterialInstanceDynamic::Create(DissolveMaterialInstance, this);
+		GetMesh()->SetMaterial(0, DynamicDissolveMaterialInstance);
+		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Dissolve"), -0.5f);
+		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Glow"), 200.f);
+		StartDissolve();
+	}
+	//Disable player movement
+	GetCharacterMovement()->DisableMovement();
+	GetCharacterMovement()->StopMovementImmediately();
+	if (ArenaPlayerController)
+	{
+		DisableInput(ArenaPlayerController);
+	}
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	//Spawn CleanBot
+	if (CleanBotEffect && CleanBotCleanSound)
+	{
+		FVector CleanBotSpawnPoint(GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z + 200.f);
+		CleanBotComponent = UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), CleanBotEffect, CleanBotSpawnPoint, GetActorRotation());
+		UGameplayStatics::SpawnSoundAtLocation(this, CleanBotCleanSound, CleanBotSpawnPoint);
+	}
+}
+
+void AArenaCharacter::PlayEliminationMontage()
+{
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance(); AnimInstance && EliminationMontage)
+	{
+		AnimInstance->Montage_Play(EliminationMontage);
+	}
+}
+
+void AArenaCharacter::ElimTimerFinished()
+{
+	if (AArenaGameMode* ArenaGameMode = GetWorld()->GetAuthGameMode<AArenaGameMode>())
+	{
+		ArenaGameMode->RequestRespawn(this, Controller);
+	}	
+}
+
+void AArenaCharacter::StartDissolve()
+{
+	DissolveTrack.BindDynamic(this, &ThisClass::UpdateDissolveMaterial);
+	if (DissolveCurve)
+	{
+		DissolveTimeline->AddInterpFloat(DissolveCurve, DissolveTrack);
+		DissolveTimeline->Play();
+	}
+}
+
+void AArenaCharacter::UpdateDissolveMaterial(float DissolveValue)
+{
+	if (DynamicDissolveMaterialInstance)
+	{
+		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Dissolve"), DissolveValue);
 	}
 }
 
@@ -407,11 +565,6 @@ void AArenaCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon)
 	}
 }
 
-void AArenaCharacter::MulticastHit_Implementation()
-{
-	PlayHitReactMontage();
-}
-
 bool AArenaCharacter::IsWeaponEquipped()
 {
 	return (Combat && Combat->EquippedWeapon);
@@ -434,5 +587,12 @@ FVector AArenaCharacter::GetHitTarget() const
 	return Combat->HitTarget;
 }
 
-
+void AArenaCharacter::Destroyed()
+{
+	Super::Destroyed();
+	if (CleanBotComponent)
+	{
+		CleanBotComponent->DestroyComponent();
+	}
+}
 

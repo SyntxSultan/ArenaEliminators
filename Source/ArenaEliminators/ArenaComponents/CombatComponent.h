@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "ArenaEliminators/HUD/ArenaHUD.h"
+#include "ArenaEliminators/Weapon/WeaponTypes.h"
+#include "ArenaEliminators/ArenaTypes/CombatState.h"
 #include "Components/ActorComponent.h"
 #include "CombatComponent.generated.h"
 
@@ -24,6 +26,9 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
 	void EquipWeapon(AWeapon* WeaponToEquip);
+	void Reload();
+	UFUNCTION(BlueprintCallable)
+	void FinishRelaoding();
 protected:
 	virtual void BeginPlay() override;
 
@@ -44,6 +49,12 @@ protected:
 
 	void TraceUnderCrosshair(FHitResult& TraceHitResult);
 	void SetHUDCrosshairs(float DeltaTime);
+
+	UFUNCTION(Server, Reliable)
+	void ServerReload();
+	void HandleReload();
+	int32 AmountToReload();
+	void UpdateAmmoValues();
 private:	
 	AArenaCharacter* Character;
 	AArenaPlayerController* PlayerController;
@@ -69,8 +80,8 @@ private:
 	float CrosshairInAirFactor;
 	float CrosshairAimFactor;
 	float CrosshairShootingFactor;
-	
 	FHUDPackage HUDPackage;
+	
 	//Fov Settings
 	float DefaultFOV;
 	float CurrentFOV;
@@ -85,4 +96,23 @@ private:
 	bool bCanFire = true;
 	void StartFireTimer();
 	void FireTimerFinished();
+
+	bool CanFire();
+	
+	//Carried Ammo for currently equipped weapon
+	UPROPERTY(ReplicatedUsing=OnRep_CarriedAmmo)
+	int32 CarriedAmmo;
+	UFUNCTION()
+	void OnRep_CarriedAmmo();
+	TMap<EWeaponType, int32> CarriedAmmoMap;
+	void InitializeCarriedAmmo();
+	
+	//Start Ammo values
+	UPROPERTY(EditAnywhere)
+	int32 StartingARAmmo = 30;
+
+	UPROPERTY(ReplicatedUsing=OnRep_CombatState)
+	ECombatState CombatState = ECombatState::ECS_Unoccupied;
+	UFUNCTION()
+	void OnRep_CombatState();
 };

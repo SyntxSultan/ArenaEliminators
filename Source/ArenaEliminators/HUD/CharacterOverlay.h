@@ -6,6 +6,8 @@
 #include "Blueprint/UserWidget.h"
 #include "CharacterOverlay.generated.h"
 
+class AArenaCharacter;
+class AArenaPlayerController;
 class UTextBlock;
 class UProgressBar;
 
@@ -18,4 +20,12 @@ public:
 	UProgressBar* HealthBar;
 	UPROPERTY(meta=(BindWidget))
 	UTextBlock* HealthText;
+	UPROPERTY(meta=(BindWidget))
+	UTextBlock* ScoreAmount;
+	UPROPERTY(meta=(BindWidget))
+	UTextBlock* DefeatsAmount;
+	UPROPERTY(meta=(BindWidget))
+	UTextBlock* WeaponAmmoAmount;
+	UPROPERTY(meta=(BindWidget))
+	UTextBlock* CarriedAmmoAmount;
 };

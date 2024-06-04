@@ -13,9 +13,14 @@ class ARENAELIMINATORS_API AArenaPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 public:
-	void SetHUDHealth(float Health, float MaxHealth);
-protected:
 	virtual void BeginPlay() override;
+	virtual void OnPossess(APawn* InPawn) override;
+	void SetHUDHealth(float Health, float MaxHealth);
+	void SetHUDScore(float Score);
+	void SetHUDDefeats(int32 Defeats);
+	void SetHUDWeaponAmmo(int32 Ammo, int32 MagCap);
+	void SetHUDCarriedAmmo(int32 Ammo);
 private:
+	UPROPERTY()
 	AArenaHUD* ArenaHUD;
 };

@@ -4,6 +4,7 @@
 #include "ArenaCharacterAnimInstance.h"
 #include "ArenaCharacter.h"
 #include "ArenaEliminators/Weapon/Weapon.h"
+#include "ArenaEliminators/ArenaTypes/CombatState.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 
@@ -34,7 +35,9 @@ void UArenaCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bAiming = ArenaCharacter->IsAiming();
 	bRotateRootBone = ArenaCharacter->ShouldRotateRootBone();
 	TurningInPlace = ArenaCharacter->GetTurningInPlace();
-
+	bEliminated = ArenaCharacter->IsEliminated();
+	bUseFABRIK = ArenaCharacter->GetCombatState() != ECombatState::ECS_Reloading;
+	
 	// Offset yaw for strafing
 	FRotator AimRotation = ArenaCharacter->GetBaseAimRotation();
 	FRotator MovementRotation = UKismetMathLibrary::MakeRotFromX(ArenaCharacter->GetVelocity());
