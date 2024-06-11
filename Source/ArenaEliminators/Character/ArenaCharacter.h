@@ -43,6 +43,9 @@ public:
 	void Eliminated();
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastEliminated();
+	
+	UPROPERTY(EditAnywhere, Category=Input)
+	UInputMappingContext* PlayerMovementContext;
 protected:
 	virtual void BeginPlay() override;
 	virtual void Jump() override;
@@ -157,8 +160,7 @@ private:
 	UAnimMontage* ReloadMontage;
 	
 	//Inputs
-	UPROPERTY(EditAnywhere, Category=Input)
-	UInputMappingContext* PlayerMovementContext;
+	
 	UPROPERTY(EditAnywhere, Category=Input)
 	UInputAction* MovementAction;
 	UPROPERTY(EditAnywhere, Category=Input)

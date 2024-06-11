@@ -13,7 +13,7 @@
 #include "ArenaEliminators/PlayerController/ArenaPlayerController.h"
 #include "Camera/CameraComponent.h"
 #include "TimerManager.h"
-#include "Components/SlateWrapperTypes.h"
+#include "Sound/SoundCue.h"
 
 UCombatComponent::UCombatComponent()
 {
@@ -140,11 +140,34 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 	{
 		PlayerController->SetHUDCarriedAmmo(CarriedAmmo);
 	}
+	if (EquippedWeapon->EquipSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, EquippedWeapon->EquipSound, Character->GetActorLocation());
+	}
+}
+
+void UCombatComponent::OnRep_EquippedWeapon()
+{
+	if (EquippedWeapon && Character)
+	{
+		EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+		const USkeletalMeshSocket* HandSocket = Character->GetMesh()->GetSocketByName(FName("RightHandSocket"));
+		if (HandSocket)
+		{
+			HandSocket->AttachActor(EquippedWeapon, Character->GetMesh());
+		}
+		Character->GetCharacterMovement()->bOrientRotationToMovement = false;
+		Character->bUseControllerRotationYaw = true;
+		if (EquippedWeapon->EquipSound)
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, EquippedWeapon->EquipSound, Character->GetActorLocation());
+		}
+	}
 }
 
 void UCombatComponent::Reload()
 {
-	if (CarriedAmmo > 0 && CombatState != ECombatState::ECS_Reloading)
+	if (CarriedAmmo > 0 && CombatState != ECombatState::ECS_Reloading && EquippedWeapon->GetAmmo() != EquippedWeapon->GetMagCapacity())
 	{
 		ServerReload();
 	}	
@@ -222,21 +245,6 @@ void UCombatComponent::OnRep_CombatState()
 	}
 }
 
-void UCombatComponent::OnRep_EquippedWeapon()
-{
-	if (EquippedWeapon && Character)
-	{
-		EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
-		const USkeletalMeshSocket* HandSocket = Character->GetMesh()->GetSocketByName(FName("RightHandSocket"));
-		if (HandSocket)
-		{
-			HandSocket->AttachActor(EquippedWeapon, Character->GetMesh());
-		}
-		Character->GetCharacterMovement()->bOrientRotationToMovement = false;
-		Character->bUseControllerRotationYaw = true;
-	}
-}
-
 bool UCombatComponent::CanFire()
 {
 	if (EquippedWeapon == nullptr) return false;
@@ -254,6 +262,7 @@ void UCombatComponent::OnRep_CarriedAmmo()
 
 void UCombatComponent::Fire()
 {
+	if (Character == nullptr || EquippedWeapon == nullptr) return;
 	if (CanFire())
 	{
 		bCanFire = false;
@@ -264,7 +273,10 @@ void UCombatComponent::Fire()
 		}
 		StartFireTimer();
 	}
-	
+	else if (EquippedWeapon->IsEmpty() && CombatState != ECombatState::ECS_Reloading)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, EquippedWeapon->EmptyFireSound, Character->GetActorLocation());
+	}
 }
 
 void UCombatComponent::FireButtonPressed(bool bPressed)

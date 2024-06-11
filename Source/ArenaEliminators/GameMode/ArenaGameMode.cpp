@@ -8,6 +8,42 @@
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
 
+namespace MatchState
+{
+	const FName Cooldown = FName("Cooldown");
+}
+
+AArenaGameMode::AArenaGameMode()
+{
+	bDelayedStart = true;
+}
+void AArenaGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+	LevelStartTime = GetWorld()->GetTimeSeconds();
+}
+
+void AArenaGameMode::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (MatchState == MatchState::WaitingToStart)
+	{
+		CountdownTime = WarmupTime - GetWorld()->GetTimeSeconds() + LevelStartTime;
+		if (CountdownTime <= 0.f)
+		{
+			StartMatch();
+		}
+	}
+	else if (MatchState == MatchState::InProgress)
+	{
+		CountdownTime = WarmupTime + MatchTime - GetWorld()->GetTimeSeconds() + LevelStartTime;
+		if (CountdownTime <= 0.f)
+		{
+			SetMatchState(MatchState::Cooldown);
+		}
+	}
+}
+
 void AArenaGameMode::PlayerEliminated(AArenaCharacter* EliminatedCharacter, AArenaPlayerController* VictimController, AArenaPlayerController* AttackerController)
 {
 	AArenaPlayerState* AttackerPlayerState = AttackerController ? Cast<AArenaPlayerState>(AttackerController->PlayerState) : nullptr;
@@ -84,7 +120,7 @@ void AArenaGameMode::RequestRespawn(ACharacter* EliminatedCharacter, AController
 		}
 	}
 	
-	/*
+	/* only random start
 	if (EliminatedCharacter)
 	{
 		EliminatedCharacter->Reset();
@@ -98,4 +134,17 @@ void AArenaGameMode::RequestRespawn(ACharacter* EliminatedCharacter, AController
 		RestartPlayerAtPlayerStart(EliminatedController, PlayerStarts[Select]);
 	}
 	*/
+}
+
+void AArenaGameMode::OnMatchStateSet()
+{
+	Super::OnMatchStateSet();
+	for (FConstControllerIterator It = GetWorld()->GetControllerIterator(); It; ++It)
+	{
+		AArenaPlayerController* ArenaPlayer = Cast<AArenaPlayerController>(*It);
+		if (ArenaPlayer)
+		{
+			ArenaPlayer->OnMatchStateSet(MatchState);
+		}
+	}
 }

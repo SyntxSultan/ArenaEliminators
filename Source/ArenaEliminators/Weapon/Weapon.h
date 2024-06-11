@@ -22,6 +22,7 @@ class UAnimationAsset;
 class UWidgetComponent;
 class ABulletShell;
 class UTexture2D;
+class USoundCue;
 
 UCLASS()
 class ARENAELIMINATORS_API AWeapon : public AActor
@@ -59,6 +60,10 @@ public:
 	float FireDelay = 0.15f;
 	UPROPERTY(EditAnywhere, Category="Weapon Properties")
 	bool bAutomatic = true;
+	UPROPERTY(EditAnywhere, Category="Weapon Properties")
+	USoundCue* EquipSound;
+	UPROPERTY(EditAnywhere, Category="Weapon Properties")
+	USoundCue* EmptyFireSound;
 protected:
 	virtual void BeginPlay() override;
 	UFUNCTION()

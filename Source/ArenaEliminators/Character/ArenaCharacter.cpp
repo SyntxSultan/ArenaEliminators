@@ -61,6 +61,7 @@ AArenaCharacter::AArenaCharacter()
 	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
 	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+
 }
 
 void AArenaCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -87,7 +88,7 @@ void AArenaCharacter::BeginPlay()
 	}
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetWorld()->GetFirstLocalPlayerFromController()))
 		{
 			Subsystem->AddMappingContext(PlayerMovementContext, 0);
 		}
@@ -158,6 +159,7 @@ void AArenaCharacter::Look(const FInputActionValue& Value)
 
 void AArenaCharacter::Jump()
 {
+	GEngine->AddOnScreenDebugMessage(4, 6.f, FColor::Blue, FString("Jump"));
 	if (bIsCrouched)
 	{
 		UnCrouch();

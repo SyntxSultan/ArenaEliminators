@@ -3,14 +3,14 @@
 
 #include "ArenaHUD.h"
 
-#include "Blueprint/UserWidget.h"
+#include "Announcement.h"
 #include "CharacterOverlay.h"
+#include "Blueprint/UserWidget.h"
 #include "GameFramework/PlayerController.h"
 
 void AArenaHUD::BeginPlay()
 {
 	Super::BeginPlay();
-	AddCharacterOverlay();
 }
 
 void AArenaHUD::AddCharacterOverlay()
@@ -19,6 +19,16 @@ void AArenaHUD::AddCharacterOverlay()
 	{
 		CharacterOverlay = CreateWidget<UCharacterOverlay>(PlayerController, CharacterOverlayClass);
 		CharacterOverlay->AddToViewport();
+	}
+}
+
+void AArenaHUD::AddAnnouncement()
+{
+	APlayerController* PlayerController = GetOwningPlayerController();
+	if (PlayerController && AnnouncementClass)
+	{
+		Announcement = CreateWidget<UAnnouncement>(PlayerController, AnnouncementClass);
+		Announcement->AddToViewport();
 	}
 }
 

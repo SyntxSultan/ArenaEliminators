@@ -6,8 +6,10 @@
 #include "GameFramework/HUD.h"
 #include "ArenaHUD.generated.h"
 
+class UAnnouncement;
 class UCharacterOverlay;
 class UTexture2D;
+class UUserWidget;
 
 USTRUCT(BlueprintType)
 struct FHUDPackage
@@ -30,13 +32,22 @@ class ARENAELIMINATORS_API AArenaHUD : public AHUD
 public:
 	virtual void DrawHUD() override;
 
+	//Character Overlay
 	UPROPERTY(EditAnywhere, Category="Player Stats")
-	TSubclassOf<class UUserWidget> CharacterOverlayClass;
-	
+	TSubclassOf<UUserWidget> CharacterOverlayClass;
+	void AddCharacterOverlay();
+	UPROPERTY()
 	UCharacterOverlay* CharacterOverlay;
+	
+	//Announcement Widget
+	UPROPERTY(EditAnywhere, Category="Announcements")
+	TSubclassOf<UUserWidget> AnnouncementClass;
+	void AddAnnouncement();
+	UPROPERTY()
+	UAnnouncement* Announcement;
+	
 protected:
 	virtual void BeginPlay() override;
-	void AddCharacterOverlay();
 private:
 	FHUDPackage HUDPackage;
 	void DrawCrosshair(UTexture2D* Texture, FVector2D ViewportCenter, FVector2D Spread, FLinearColor CrosshairColor);

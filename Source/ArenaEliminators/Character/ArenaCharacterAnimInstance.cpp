@@ -37,6 +37,8 @@ void UArenaCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	TurningInPlace = ArenaCharacter->GetTurningInPlace();
 	bEliminated = ArenaCharacter->IsEliminated();
 	bUseFABRIK = ArenaCharacter->GetCombatState() != ECombatState::ECS_Reloading;
+	bUseAimOffsets = ArenaCharacter->GetCombatState() != ECombatState::ECS_Reloading;
+	bTransformRightHand = ArenaCharacter->GetCombatState() != ECombatState::ECS_Reloading;
 	
 	// Offset yaw for strafing
 	FRotator AimRotation = ArenaCharacter->GetBaseAimRotation();
