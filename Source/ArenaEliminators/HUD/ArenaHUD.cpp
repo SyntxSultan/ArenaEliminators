@@ -15,7 +15,8 @@ void AArenaHUD::BeginPlay()
 
 void AArenaHUD::AddCharacterOverlay()
 {
-	if (APlayerController* PlayerController = GetOwningPlayerController(); PlayerController && CharacterOverlayClass)
+	APlayerController* PlayerController = GetOwningPlayerController();
+	if (PlayerController && CharacterOverlayClass)
 	{
 		CharacterOverlay = CreateWidget<UCharacterOverlay>(PlayerController, CharacterOverlayClass);
 		CharacterOverlay->AddToViewport();
@@ -35,12 +36,16 @@ void AArenaHUD::AddAnnouncement()
 void AArenaHUD::DrawHUD()
 {
 	Super::DrawHUD();
-	if (GEngine)
+	if (GEngine && bDrawCrosshair)
 	{
 		FVector2D ViewportSize;
 		GEngine->GameViewport->GetViewportSize(ViewportSize);
 		const FVector2D ViewportCenter(ViewportSize.X / 2.f, ViewportSize.Y / 2.f);
-		float SpreadScaled = CrosshairSpreadMax * HUDPackage.CrosshairSpread;
+		float SpreadScaled = 0;
+		if (HUDPackage.CrosshairSpread)
+		{
+			SpreadScaled = CrosshairSpreadMax * HUDPackage.CrosshairSpread;
+		}
 		if (HUDPackage.CrosshairCenter)
 		{
 			FVector2D Spread(0.f, 0.f);
@@ -71,20 +76,22 @@ void AArenaHUD::DrawHUD()
 
 void AArenaHUD::DrawCrosshair(UTexture2D* Texture, FVector2D ViewportCenter, FVector2D Spread, FLinearColor CrosshairColor)
 {
-	const float TextureWidth = Texture->GetSizeX();
-	const float TextureHeight = Texture->GetSizeY();
-	const FVector2D DrawPoint(
-		ViewportCenter.X - (TextureWidth / 2.f) + Spread.X,
-		ViewportCenter.Y - (TextureHeight / 2.f) + Spread.Y
-	);
-	DrawTexture(Texture, DrawPoint.X, DrawPoint.Y,
-		TextureWidth,
-		TextureHeight,
-		0.f,
-		0.f,
-		1.f,
-		1.f,
-		CrosshairColor
-	);
-	
+	if (Texture)
+	{
+		const float TextureWidth = Texture->GetSizeX();
+		const float TextureHeight = Texture->GetSizeY();
+		const FVector2D DrawPoint(
+			ViewportCenter.X - (TextureWidth / 2.f) + Spread.X,
+			ViewportCenter.Y - (TextureHeight / 2.f) + Spread.Y
+		);
+		DrawTexture(Texture, DrawPoint.X, DrawPoint.Y,
+		            TextureWidth,
+		            TextureHeight,
+		            0.f,
+		            0.f,
+		            1.f,
+		            1.f,
+		            CrosshairColor
+		);
+	}
 }

@@ -247,8 +247,8 @@ void UCombatComponent::OnRep_CombatState()
 
 bool UCombatComponent::CanFire()
 {
-	if (EquippedWeapon == nullptr) return false;
-	return !EquippedWeapon->IsEmpty() && bCanFire && CombatState == ECombatState::ECS_Unoccupied;
+	if (EquippedWeapon == nullptr || Character == nullptr) return false;
+	return !EquippedWeapon->IsEmpty() && bCanFire && CombatState == ECombatState::ECS_Unoccupied && !Character->IsSprinting();
 }
 
 void UCombatComponent::OnRep_CarriedAmmo()

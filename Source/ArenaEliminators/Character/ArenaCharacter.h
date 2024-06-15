@@ -16,10 +16,12 @@ class AWeapon;
 class UCombatComponent;
 class AArenaPlayerState;
 class AArenaPlayerController;
+class UForceFeedbackEffect;
 class UWidgetComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
+class UCameraShakeBase;
 class UInputAction;
 class UAnimMontage;
 class USoundCue;
@@ -48,6 +50,7 @@ public:
 	UInputMappingContext* PlayerMovementContext;
 protected:
 	virtual void BeginPlay() override;
+	void RotateInPlace(float DeltaTime);
 	virtual void Jump() override;
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
@@ -55,6 +58,8 @@ protected:
 	void CrouchButtonPressed();
 	void AimButtonPressed();
 	void AimButtonReleased();
+	void SprintButtonPressed();
+	void SprintButtonReleased();
 	void ReloadButtonPressed();
 	void CalculateAO_Pitch();
 	void AimOffset(float DeltaTime);
@@ -67,10 +72,21 @@ protected:
 	UFUNCTION()
 	void ReceiveDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, class AController* InstigatorController, AActor* DamageCauser);
 private:
+	bool bSprinting = false;
 	UPROPERTY()
 	AArenaPlayerController* ArenaPlayerController;
 	UPROPERTY()
 	AArenaPlayerState* ArenaPlayerState;
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<UCameraShakeBase> WalkCameraShake;
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<UCameraShakeBase> SprintCameraShake;
+
+	UPROPERTY(EditAnywhere)
+	UForceFeedbackEffect* HitForceFeedback;
+	UPROPERTY(EditAnywhere)
+	UForceFeedbackEffect* DieForceFeedback;
 	
 	//Components
 	UPROPERTY(VisibleAnywhere, Category=Camera)
@@ -164,6 +180,8 @@ private:
 	UPROPERTY(EditAnywhere, Category=Input)
 	UInputAction* MovementAction;
 	UPROPERTY(EditAnywhere, Category=Input)
+	UInputAction* SprintAction;
+	UPROPERTY(EditAnywhere, Category=Input)
 	UInputAction* LookAction;
 	UPROPERTY(EditAnywhere, Category=Input)
 	UInputAction* JumpAction;
@@ -189,6 +207,7 @@ public:
 	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
 	FORCEINLINE bool ShouldRotateRootBone() const { return bRotateRootBone; }
 	FORCEINLINE bool IsEliminated() const { return bEliminated; }
+	FORCEINLINE bool IsSprinting() const { return bSprinting; }
 	FORCEINLINE ETurningInPlace GetTurningInPlace() const { return TurningInPlace; }
 	FORCEINLINE ECombatState GetCombatState() const { return Combat == nullptr ? ECombatState::ECS_MAX : Combat->CombatState; }
 	FORCEINLINE UCameraComponent* GetCamera() const { return Camera; }

@@ -23,6 +23,7 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Camera/CameraShakeBase.h"
 
 AArenaCharacter::AArenaCharacter()
 {
@@ -86,7 +87,7 @@ void AArenaCharacter::BeginPlay()
 	{
 		OnTakeAnyDamage.AddDynamic(this, &ThisClass::ReceiveDamage);
 	}
-	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
+	if ([[maybe_unused]] APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetWorld()->GetFirstLocalPlayerFromController()))
 		{
@@ -99,6 +100,12 @@ void AArenaCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	PollInit();
+	RotateInPlace(DeltaTime);
+	HideCameraIfCharacterClose();
+}
+
+void AArenaCharacter::RotateInPlace(float DeltaTime)
+{
 	if (GetLocalRole() > ROLE_SimulatedProxy && IsLocallyControlled())
 	{
 		AimOffset(DeltaTime);
@@ -112,7 +119,6 @@ void AArenaCharacter::Tick(float DeltaTime)
 		}
 		CalculateAO_Pitch();
 	}
-	HideCameraIfCharacterClose();
 }
 
 void AArenaCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -130,6 +136,8 @@ void AArenaCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &ThisClass::FireButtonPressed);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &ThisClass::FireButtonReleased);
 		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Started, this, &ThisClass::ReloadButtonPressed);
+		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &ThisClass::SprintButtonPressed);
+		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &ThisClass::SprintButtonReleased);
 	}
 }
 
@@ -141,6 +149,47 @@ void AArenaCharacter::Move(const FInputActionValue& Value)
 	const FVector RightDirection(FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y));
 	AddMovementInput(ForwardDirection, MovementVector.Y);
 	AddMovementInput(RightDirection, MovementVector.X);
+	//Cam Shake only standing move
+	if (!bSprinting && WalkCameraShake != nullptr && IsLocallyControlled() && !GetCharacterMovement()->IsFalling() && !GetCharacterMovement()->IsCrouching())
+	{
+		GetWorld()->GetFirstPlayerController()->ClientStopCameraShake(SprintCameraShake);
+		GetWorld()->GetFirstPlayerController()->ClientStartCameraShake(WalkCameraShake);
+	}
+}
+
+void AArenaCharacter::SprintButtonPressed()
+{
+	bSprinting = true;
+	GetCharacterMovement()->MaxWalkSpeed = 1200.f;
+	UnCrouch();
+	if (SprintCameraShake != nullptr && IsLocallyControlled() && !GetCharacterMovement()->IsFalling() && !GetCharacterMovement()->IsCrouching())
+	{
+		GetWorld()->GetFirstPlayerController()->ClientStopCameraShake(WalkCameraShake);
+		GetWorld()->GetFirstPlayerController()->ClientStartCameraShake(SprintCameraShake);
+	}
+	
+	ArenaPlayerController = ArenaPlayerController == nullptr ? Cast<AArenaPlayerController>(Controller)  : ArenaPlayerController;
+	if (ArenaPlayerController)
+	{
+		if (AArenaHUD* HUD = Cast<AArenaHUD>(ArenaPlayerController->GetHUD()))
+		{
+			HUD->bDrawCrosshair = false;
+		}
+	}
+}
+
+void AArenaCharacter::SprintButtonReleased()
+{
+	bSprinting = false;
+	GetCharacterMovement()->MaxWalkSpeed = Combat->BaseWalkSpeed;
+	ArenaPlayerController = ArenaPlayerController == nullptr ? Cast<AArenaPlayerController>(Controller)  : ArenaPlayerController;
+	if (ArenaPlayerController)
+	{
+		if (AArenaHUD* HUD = Cast<AArenaHUD>(ArenaPlayerController->GetHUD()))
+		{
+			HUD->bDrawCrosshair = true;
+		}
+	}
 }
 
 void AArenaCharacter::OnRep_ReplicatedMovement()
@@ -159,7 +208,6 @@ void AArenaCharacter::Look(const FInputActionValue& Value)
 
 void AArenaCharacter::Jump()
 {
-	GEngine->AddOnScreenDebugMessage(4, 6.f, FColor::Blue, FString("Jump"));
 	if (bIsCrouched)
 	{
 		UnCrouch();
@@ -199,7 +247,7 @@ void AArenaCharacter::CrouchButtonPressed()
 	{
 		UnCrouch();
 	}
-	else if (!GetCharacterMovement()->IsFalling())
+	else if (!GetCharacterMovement()->IsFalling() && !bSprinting)
 	{		
 		Crouch();
 	}
@@ -207,7 +255,7 @@ void AArenaCharacter::CrouchButtonPressed()
 
 void AArenaCharacter::AimButtonPressed()
 {
-	if (Combat)
+	if (Combat && !bSprinting)
 	{
 		Combat->SetAiming(true);
 	}
@@ -215,7 +263,7 @@ void AArenaCharacter::AimButtonPressed()
 
 void AArenaCharacter::AimButtonReleased()
 {
-	if (Combat)
+	if (Combat && !bSprinting)
 	{
 		Combat->SetAiming(false);
 	}
@@ -465,6 +513,15 @@ void AArenaCharacter::Eliminated()
 	{
 		Combat->EquippedWeapon->Dropped();
 	}
+	//Play force feedback
+	if (DieForceFeedback)
+	{
+		ArenaPlayerController = ArenaPlayerController == nullptr ? Cast<AArenaPlayerController>(Controller)  : ArenaPlayerController;
+		if (ArenaPlayerController)
+		{
+			ArenaPlayerController->ClientPlayForceFeedback(DieForceFeedback);
+		}
+	}
 	MulticastEliminated();
 	GetWorldTimerManager().SetTimer(ElimTimer, this, &ThisClass::ElimTimerFinished, ElimDelay);
 }
@@ -592,9 +649,17 @@ FVector AArenaCharacter::GetHitTarget() const
 void AArenaCharacter::Destroyed()
 {
 	Super::Destroyed();
+	
 	if (CleanBotComponent)
 	{
 		CleanBotComponent->DestroyComponent();
+	}
+	//destroy weapon only when game is not started
+	AArenaGameMode* GameMode = Cast<AArenaGameMode>(UGameplayStatics::GetGameMode(this));
+	bool bMatchNotInProgress = GameMode && GameMode->GetMatchState() != MatchState::InProgress;
+	if (bMatchNotInProgress && Combat && Combat->EquippedWeapon)
+	{
+		Combat->EquippedWeapon->Destroy();
 	}
 }
 

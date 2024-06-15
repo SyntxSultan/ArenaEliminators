@@ -10,10 +10,17 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
 	Super::PostLogin(NewPlayer);
 
 	int32 NumberOfPlayers = GameState.Get()->PlayerArray.Num();
-	if (NumberOfPlayers == 1)
+	if (NumberOfPlayers == PlayersToStart)
 	{
 		UWorld* World = GetWorld();
 		bUseSeamlessTravel = true;
 		World->ServerTravel(FString("/Game/Maps/ArenaMap?listen"));
 	}
+}
+
+void ALobbyGameMode::StartGameImmidiately()
+{
+	UWorld* World = GetWorld();
+	bUseSeamlessTravel = true;
+	World->ServerTravel(FString("/Game/Maps/ArenaMap?listen"));
 }

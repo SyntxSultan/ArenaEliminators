@@ -3,6 +3,7 @@
 
 #include "ArenaGameMode.h"
 #include "ArenaEliminators/Character/ArenaCharacter.h"
+#include "ArenaEliminators/GameState/ArenaGameState.h"
 #include "ArenaEliminators/PlayerController/ArenaPlayerController.h"
 #include "ArenaEliminators/PlayerState/ArenaPlayerState.h"
 #include "GameFramework/PlayerStart.h"
@@ -42,17 +43,26 @@ void AArenaGameMode::Tick(float DeltaSeconds)
 			SetMatchState(MatchState::Cooldown);
 		}
 	}
+	else if (MatchState == MatchState::Cooldown)
+	{
+		CountdownTime = CooldownTime + WarmupTime + MatchTime - GetWorld()->GetTimeSeconds() + LevelStartTime;
+		if (CountdownTime <= 0.f)
+		{
+			RestartGame();
+		}
+	}
 }
 
 void AArenaGameMode::PlayerEliminated(AArenaCharacter* EliminatedCharacter, AArenaPlayerController* VictimController, AArenaPlayerController* AttackerController)
 {
 	AArenaPlayerState* AttackerPlayerState = AttackerController ? Cast<AArenaPlayerState>(AttackerController->PlayerState) : nullptr;
 	AArenaPlayerState* VictimPlayerState = VictimController ? Cast<AArenaPlayerState>(VictimController->PlayerState) : nullptr;
-
+	AArenaGameState* ArenaGameState = GetGameState<AArenaGameState>();
 	//Adding attackers score
 	if (AttackerPlayerState && AttackerPlayerState != VictimPlayerState)
 	{
 		AttackerPlayerState->AddToScore(1);
+		ArenaGameState->UpdateTopScore(AttackerPlayerState);
 	}
 	// Adding defeats to eliminated player
 	if (VictimPlayerState)

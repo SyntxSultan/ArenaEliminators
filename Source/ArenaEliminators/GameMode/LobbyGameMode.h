@@ -15,4 +15,9 @@ class ARENAELIMINATORS_API ALobbyGameMode : public AGameMode
 	GENERATED_BODY()
 public:
 	virtual void PostLogin(APlayerController* NewPlayer) override;
+	UFUNCTION(BlueprintCallable)
+	void StartGameImmidiately();
+
+	UPROPERTY(EditDefaultsOnly)
+	int32 PlayersToStart = 1;
 };

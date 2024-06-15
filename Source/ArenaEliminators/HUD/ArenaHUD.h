@@ -32,6 +32,7 @@ class ARENAELIMINATORS_API AArenaHUD : public AHUD
 public:
 	virtual void DrawHUD() override;
 
+	bool bDrawCrosshair = true;
 	//Character Overlay
 	UPROPERTY(EditAnywhere, Category="Player Stats")
 	TSubclassOf<UUserWidget> CharacterOverlayClass;
@@ -45,7 +46,6 @@ public:
 	void AddAnnouncement();
 	UPROPERTY()
 	UAnnouncement* Announcement;
-	
 protected:
 	virtual void BeginPlay() override;
 private:

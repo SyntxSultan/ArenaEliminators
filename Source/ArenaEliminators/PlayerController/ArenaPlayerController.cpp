@@ -6,6 +6,8 @@
 #include "EnhancedInputSubsystems.h"
 #include "ArenaEliminators/Character/ArenaCharacter.h"
 #include "ArenaEliminators/GameMode/ArenaGameMode.h"
+#include "ArenaEliminators/GameState/ArenaGameState.h"
+#include "ArenaEliminators/PlayerState/ArenaPlayerState.h"
 #include "ArenaEliminators/HUD/Announcement.h"
 #include "ArenaEliminators/HUD/ArenaHUD.h"
 #include "ArenaEliminators/HUD/CharacterOverlay.h"
@@ -341,7 +343,35 @@ void AArenaPlayerController::HandleCooldown()
 			ArenaHUD->Announcement->SetVisibility(ESlateVisibility::Visible);
 			FString AnnouncementText("New Match Starts In:");
 			ArenaHUD->Announcement->AnnouncementText->SetText(FText::FromString(AnnouncementText));
-			ArenaHUD->Announcement->InfoText->SetText(FText::FromString(FString("Hello niggers")));
+			
+			AArenaGameState* ArenaGameState = Cast<AArenaGameState>(UGameplayStatics::GetGameState(this));
+			AArenaPlayerState* ArenaPlayerState = GetPlayerState<AArenaPlayerState>();
+			if (ArenaGameState && ArenaPlayerState)
+			{
+				TArray<AArenaPlayerState*> TopPlayers = ArenaGameState->TopScoringPlayers;
+				FString InfoTextString;
+				if (TopPlayers.Num() == 0)
+				{
+					InfoTextString = FString("There is no winner, what a disgrace");
+				}
+				else if (TopPlayers.Num() == 1 && TopPlayers[0] == ArenaPlayerState)
+				{
+					InfoTextString = FString("Winner winner chicken dinner!");
+				}
+				else if (TopPlayers.Num() == 1)
+				{
+					InfoTextString = FString::Printf(TEXT("Winner: \n%s"), *TopPlayers[0]->GetPlayerName());
+				}
+				else if (TopPlayers.Num() > 1)
+				{
+					InfoTextString = FString("Players tied for the win:\n");
+					for (auto TiedPlayer : TopPlayers)
+					{
+						InfoTextString.Append(FString::Printf(TEXT("%s\n"), *TiedPlayer->GetPlayerName()));
+					}
+				}
+				ArenaHUD->Announcement->InfoText->SetText(FText::FromString(InfoTextString));
+			}
 		}
 	}
 }
